@@ -1,0 +1,148 @@
+#Going to make a nice presence/absence clustered heatmap. It will be ordered in a specific way on the Y axis and clustered on the X axis. 
+
+setwd("~/Documents/mcp1/")
+path <- "~/Documents/mcp1/"
+library("pheatmap")
+library(gplots)
+library(ggplot2)
+library(ape)
+library(Rphylip)
+library(vegan)
+library(caper)
+library("readxl")
+library(RColorBrewer)
+
+mcp <- as.matrix(read.csv("Realpangenome_matrix_t0.tr.fix_reordered.csv", sep=",", row.names=1, header=T))
+View(mcp)
+sapply(mcp, class)
+
+rootedtree <- read.tree(file = "rooty/tree.majority0.9.tre")
+rootedtree1 <- root(rootedtree, outgroup = "Vibrio_mimicus_07-2442")
+is.rooted(drop.tip(rootedtree1, "Vibrio_mimicus_07-2442"))
+dropped_root <- drop.tip(rootedtree1, "Vibrio_mimicus_07-2442")
+is.rooted(rootedtree1)
+is.rooted(dropped_root)
+unrooted <- unroot(dropped_root)
+#write.nexus(dropped_root, file = "dropped_root.nexus")
+plot(rootedtree1)
+plot(unrooted)
+dropped_laddered <- ladderize(dropped_root, right = TRUE)
+tree <- dropped_laddered
+plot.phylo(tree, align.tip.label = TRUE, cex = .3, 
+           direction = "leftwards" , adj= .5) +
+  add.scale.bar(cex = 0.7, font = 2, col = "red") 
+nodelabels()
+#pick the node and rotate if you want. You can skip this.
+# pick the node you want to rotate at. If you dont want to just skip this.
+tre.new <- rotate(tree, 90)
+tre.new
+plot.phylo(tre.new, 
+           align.tip.label = TRUE, cex = .3, 
+           direction = "leftwards" , adj= .5) +
+  add.scale.bar(cex = 0.7, font = 2, col = "red") 
+
+tre.new$tip.label
+tree <- tre.new
+is_tip <- tree$edge[,2] <= length(tree$tip.label)
+ordered_tips <- tree$edge[is_tip, 2]
+tree$tip.label[ordered_tips]
+tip_ord <- as.data.frame(tree$tip.label[ordered_tips], col.names = c("name"))
+colnames(tip_ord) <-  "name"
+write.csv(tip_ord, file = "tippy2.csv" )
+
+#I had to remove some dashes and replace them in excel. along with a few other fixes. i reimport here.
+cc <- read.csv("~/Documents/mcp1/tippy2.csv")
+
+#View(cc)
+tip_ord <- cc
+l <- tip_ord
+
+#import your table or matrix
+
+tmcp <- read_excel("~/Documents/mcp1/tmcp2.xlsx")
+View(tmcp)
+df <- tmcp
+tmcp$ah
+tip_ord$name
+
+mydf <- df[match(tip_ord$name, tmcp$ah),]
+View(mydf)
+#Double check if there are any blank rows. if there are any, some names might be diff
+
+my_palette1 <- colorRampPalette(c( "papayawhip", "hotpink4" ))(n = 299)
+
+
+my_paletteS = list(phyloD = colorRampPalette(c("slateblue", 
+                                      "skyblue3", "khaki2", 
+                                      "gold2", 
+                                      "gold4"))(100), 
+          type = c(Clinical="gray18",
+                   Environmental="goldenrod1",
+                   Sewage = "gray58"))
+
+row.names(mydf) <- mydf$ah
+View(mydf)
+mydf2 <- as.data.frame(mydf)
+mydf <- mydf2[,-1]
+mcp_mat <- as.matrix(mydf)
+
+pheatmap(mcp_mat, cellheight = 5, fontsize_row=5, fontsize_col = 5, 
+         cellwidth = 5, col = my_palette1, cluster_row = FALSE, 
+         fontsize_number = 3, number_color = "black", 
+         clustering_method = "complete", legend= FALSE)
+
+list_for_strain_annotation <- read_excel("~/Documents/mcp1/list_for_strain_annotation.xlsx")
+x <- list_for_strain_annotation
+View(x)
+list_for_strain_annotation <- list_for_strain_annotation[,-1]
+View(list_for_strain_annotation)
+
+row.names(list_for_strain_annotation) <- x$strain
+#View(list_for_strain_annotation)
+
+tip_ord$name
+f <- list_for_strain_annotation[match(tip_ord$name, x$strain),]
+View(f)
+row.names(f) <- tip_ord$name
+View(f)
+class(f)
+
+# Generate annotations for rows and columns
+# idk if nee
+annotation_row = data.frame(f)
+                          
+#View(list_for_strain_annotation
+
+cluster_annscopy <- read_excel("~/Documents/mcp1/cluster_anns_short.xlsx", 
+                           col_types = c("text", "numeric", "numeric"))
+
+View(cluster_annscopy)
+y <- cluster_annscopy
+
+phy_df = data.frame("phyloD" = cluster_annscopy$phyloD)
+rownames(phy_df) = y$cluster # name matching
+
+View(phy_df)
+
+
+ok = list(phyloD = colorRampPalette(c("slateblue", 
+                                      "skyblue3", "khaki2", 
+                                      "gold2", 
+                                      "gold4"))(100), 
+          type = c(Clinical="gray18", Environmental="goldenrod1",
+             Sewage = "gray68" ))
+
+my_palette <- colorRampPalette(c( "gainsboro", "darkorchid4" ))(n = 299)
+
+
+pheatmap(mcp_mat, cellheight = 5, fontsize_row=5.5, fontsize_col = 5.5, 
+         cellwidth = 5, col = my_palette, cluster_row = FALSE, 
+         annotation_colors = ok,
+         fontsize_number = 5, number_color = "black", 
+         annotation_row = annotation_row,
+         annotation_col = phy_df,
+         clustering_method = "complete", legend= FALSE)
+
+
+
+
